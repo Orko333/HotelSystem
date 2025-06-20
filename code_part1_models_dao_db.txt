@@ -1,0 +1,315 @@
+// ==== MODELS ====
+
+// include/models/Enums.h
+#pragma once
+
+// Ролі користувачів в системі
+enum class UserRole {
+    ADMINISTRATOR,
+    MANAGER,
+    RECEPTIONIST,
+    HOUSEKEEPING,
+    GUEST
+};
+
+// Типи готельних номерів
+enum class RoomType {
+    SINGLE,
+    DOUBLE,
+    SUITE,
+    DELUXE
+};
+
+// Статус готельного номера
+enum class RoomStatus {
+    AVAILABLE,
+    OCCUPIED,
+    MAINTENANCE // Потребує прибирання/обслуговування
+};
+
+// Статус бронювання
+enum class BookingStatus {
+    CONFIRMED,
+    CHECKED_IN,
+    CHECKED_OUT,
+    CANCELLED
+};
+
+// include/models/User.h
+#pragma once
+
+#include <string>
+#include <utility>
+#include <cstddef>
+#include "models/Enums.h"
+
+// Клас, що представляє користувача системи
+class User {
+public:
+    int id;
+    std::string username;
+    size_t hashedPassword; // Використовуємо size_t для хешу
+    UserRole role;
+
+    // Конструктор для існуючих користувачів з БД
+    User(int id, std::string username, size_t hashedPassword, UserRole role)
+        : id(id), username(std::move(username)), hashedPassword(hashedPassword), role(role) {}
+
+    // Конструктор для нових користувачів, яких ще немає в БД
+    User(std::string username, size_t hashedPassword, UserRole role)
+        : id(-1), username(std::move(username)), hashedPassword(hashedPassword), role(role) {}
+};
+
+// include/models/Client.h
+#pragma once
+#include <string>
+#include <utility>
+
+// Клас, що представляє клієнта готелю
+class Client {
+public:
+    int id;
+    std::string fullName;
+    std::string contactInfo;
+
+    // Конструктор для існуючих клієнтів
+    Client(int id, std::string fullName, std::string contactInfo)
+        : id(id), fullName(std::move(fullName)), contactInfo(std::move(contactInfo)) {}
+
+    // Конструктор для нових клієнтів
+    Client(std::string fullName, std::string contactInfo)
+        : id(-1), fullName(std::move(fullName)), contactInfo(std::move(contactInfo)) {}
+};
+
+// include/models/Room.h
+#pragma once
+#include <string>
+#include <utility>
+#include "models/Enums.h"
+
+// Клас, що представляє готельний номер
+class Room {
+public:
+    int id;
+    int roomNumber;
+    RoomType type;
+    RoomStatus status;
+    double pricePerNight;
+    std::string description;
+    bool hasAirConditioner;
+
+    Room(int id, int roomNumber, RoomType type, RoomStatus status, double pricePerNight, std::string description, bool hasAirConditioner)
+        : id(id), roomNumber(roomNumber), type(type), status(status), pricePerNight(pricePerNight), 
+          description(std::move(description)), hasAirConditioner(hasAirConditioner) {}
+
+    // Конструктор для нових номерів
+    Room(int roomNumber, RoomType type, RoomStatus status, double pricePerNight, std::string description, bool hasAirConditioner)
+        : id(-1), roomNumber(roomNumber), type(type), status(status), pricePerNight(pricePerNight),
+          description(std::move(description)), hasAirConditioner(hasAirConditioner) {}
+};
+
+// include/models/Booking.h
+#pragma once
+#include <string>
+#include <utility>
+#include "models/Enums.h"
+
+// Клас, що представляє бронювання
+class Booking {
+public:
+    int id;
+    int clientId;
+    int roomId;
+    std::string checkInDate;
+    std::string checkOutDate;
+    BookingStatus status;
+
+    Booking(int id, int clientId, int roomId, std::string checkInDate, std::string checkOutDate, BookingStatus status)
+        : id(id), clientId(clientId), roomId(roomId), checkInDate(std::move(checkInDate)), checkOutDate(std::move(checkOutDate)), status(status) {}
+
+    // Конструктор для нових бронювань
+    Booking(int clientId, int roomId, std::string checkInDate, std::string checkOutDate, BookingStatus status)
+        : id(-1), clientId(clientId), roomId(roomId), checkInDate(std::move(checkInDate)), checkOutDate(std::move(checkOutDate)), status(status) {}
+};
+
+// ==== DAO HEADERS ====
+
+// include/dao/UserDAO.h
+#pragma once
+
+#include "models/User.h"
+#include <string>
+#include <vector>
+#include <optional>
+#include <memory>
+
+namespace SQLite {
+    class Database;
+}
+
+// DAO для операцій з користувачами
+class UserDAO {
+public:
+    explicit UserDAO(SQLite::Database& db);
+
+    // Створює користувача в БД
+    void save(const User& user);
+    
+    // Оновлює дані користувача в БД
+    void update(const User& user);
+
+    // Видаляє користувача з БД
+    void remove(int id);
+
+    // Пошук користувача за іменем
+    std::optional<User> findByUsername(const std::string& username);
+
+    // Пошук користувача за ID
+    std::optional<User> findById(int id);
+    
+    // Отримання всіх користувачів
+    std::vector<User> findAll();
+
+private:
+    SQLite::Database& db;
+};
+
+// include/dao/ClientDAO.h
+#pragma once
+
+#include "models/Client.h"
+#include <vector>
+#include <optional>
+#include <string>
+
+namespace SQLite {
+    class Database;
+}
+
+// DAO для операцій з клієнтами
+class ClientDAO {
+public:
+    explicit ClientDAO(SQLite::Database& db);
+
+    void save(const Client& client);
+    void update(const Client& client);
+    std::optional<Client> findById(int id);
+    std::vector<Client> findByFullName(const std::string& name);
+    std::vector<Client> findAll();
+
+private:
+    SQLite::Database& db;
+};
+
+// include/dao/RoomDAO.h
+#pragma once
+
+#include "models/Room.h"
+#include <vector>
+#include <optional>
+#include <string>
+
+namespace SQLite {
+    class Database;
+}
+
+// DAO для операцій з кімнатами
+class RoomDAO {
+public:
+    explicit RoomDAO(SQLite::Database& db);
+
+    void save(const Room& room);
+    void update(const Room& room);
+    std::optional<Room> findById(int id);
+    std::optional<Room> findByNumber(int roomNumber);
+    std::vector<Room> findAll();
+    std::vector<Room> findByStatus(RoomStatus status);
+    std::vector<Room> findWithFilters(std::optional<RoomType> type, std::optional<double> maxPrice);
+    
+    // Знаходить вільні кімнати у заданому діапазоні дат (поки що не реалізовано)
+    // std::vector<Room> findAvailable(const std::string& startDate, const std::string& endDate);
+
+private:
+    SQLite::Database& db;
+};
+
+// include/dao/BookingDAO.h
+#pragma once
+
+#include "models/Booking.h"
+#include <vector>
+#include <optional>
+#include <string>
+
+namespace SQLite {
+    class Database;
+}
+
+// DAO для операцій з бронюваннями
+class BookingDAO {
+public:
+    explicit BookingDAO(SQLite::Database& db);
+
+    void save(const Booking& booking);
+    void update(const Booking& booking);
+    std::optional<Booking> findById(int id);
+    std::vector<Booking> findAll();
+    std::vector<Booking> findByClientId(int clientId);
+    std::vector<Booking> findByRoomId(int roomId);
+    std::vector<Booking> findInDateRange(const std::string& startDate, const std::string& endDate);
+    bool isRoomBookedInDateRange(int roomId, const std::string& checkInDate, const std::string& checkOutDate);
+
+private:
+    SQLite::Database& db;
+};
+
+// ==== DAO IMPLEMENTATIONS ====
+
+// src/dao/UserDAO.cpp
+[...]
+// src/dao/ClientDAO.cpp
+[...]
+// src/dao/RoomDAO.cpp
+[...]
+// src/dao/BookingDAO.cpp
+[...]
+
+// ==== DATABASE MANAGER ====
+
+// include/db/DatabaseManager.h
+#pragma once
+
+#include <string>
+#include <memory>
+#include <SQLiteCpp/SQLiteCpp.h>
+
+// Клас-одинак (Singleton) для управління з'єднанням з базою даних
+class DatabaseManager {
+public:
+    // Видаляємо конструктори копіювання та оператори присвоєння
+    DatabaseManager(const DatabaseManager&) = delete;
+    void operator=(const DatabaseManager&) = delete;
+
+    // Метод для отримання єдиного екземпляра класу
+    static DatabaseManager& getInstance();
+
+    // Метод для підключення до БД та ініціалізації схеми
+    void connect(const std::string& dbPath);
+
+    // Метод для отримання доступу до об'єкта БД
+    SQLite::Database& getDb();
+
+private:
+    // Приватний конструктор та деструктор
+    DatabaseManager() = default;
+    ~DatabaseManager() = default;
+
+    // Метод для створення таблиць у БД
+    void initSchema();
+
+    // Єдиний екземпляр з'єднання з БД
+    std::unique_ptr<SQLite::Database> db;
+};
+
+// src/db/DatabaseManager.cpp
+[...] 

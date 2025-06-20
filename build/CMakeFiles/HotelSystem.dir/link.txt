@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\HotelSystem.dir/objects.a
+C:\ProgramData\mingw64\mingw64\bin\ar.exe qc CMakeFiles\HotelSystem.dir/objects.a @CMakeFiles\HotelSystem.dir\objects1.rsp
+C:\ProgramData\mingw64\mingw64\bin\c++.exe -Wl,--whole-archive CMakeFiles\HotelSystem.dir/objects.a -Wl,--no-whole-archive -o HotelSystem.exe -Wl,--out-implib,libHotelSystem.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\HotelSystem.dir\linkLibs.rsp

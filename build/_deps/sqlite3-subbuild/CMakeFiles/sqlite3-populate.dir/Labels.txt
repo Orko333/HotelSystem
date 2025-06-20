@@ -1,0 +1,14 @@
+# Target labels
+ sqlite3-populate
+# Source files and their labels
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/sqlite3-populate
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/sqlite3-populate.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/sqlite3-populate-complete.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-build.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-configure.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-download.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-install.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-mkdir.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-patch.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-test.rule
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src/sqlite3-populate-stamp/sqlite3-populate-update.rule

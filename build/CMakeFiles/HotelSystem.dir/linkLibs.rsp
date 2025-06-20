@@ -1,0 +1,1 @@
+ "_deps/sqlitecpp-build/libSQLiteCpp.a" -lkernel32 "_deps/sqlitecpp-build/sqlite3/libsqlite3.a" -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 

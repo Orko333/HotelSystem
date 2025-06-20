@@ -1,0 +1,14 @@
+# Target labels
+ sqlitecpp-populate
+# Source files and their labels
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/CMakeFiles/sqlitecpp-populate
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/CMakeFiles/sqlitecpp-populate.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/CMakeFiles/sqlitecpp-populate-complete.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-build.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-configure.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-download.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-install.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-mkdir.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-patch.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-test.rule
+D:/other/Project_on_c++/build/_deps/sqlitecpp-subbuild/sqlitecpp-populate-prefix/src/sqlitecpp-populate-stamp/sqlitecpp-populate-update.rule

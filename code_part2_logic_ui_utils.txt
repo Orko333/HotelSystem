@@ -1,0 +1,834 @@
+// ==== LOGIC HEADERS ====
+
+// include/logic/AuthenticationManager.h
+#pragma once
+
+#include "dao/UserDAO.h"
+#include "models/User.h"
+#include <memory>
+#include <string>
+#include <optional>
+
+// Клас для управління автентифікацією та сесіями користувачів
+class AuthenticationManager {
+public:
+    // Конструктор приймає DAO через dependency injection
+    explicit AuthenticationManager(std::shared_ptr<UserDAO> userDAO);
+
+    // Спроба входу в систему
+    bool login(const std::string& username, const std::string& password);
+
+    // Вихід з системи
+    void logout();
+
+    // Створення нового користувача
+    bool createUser(const std::string& username, const std::string& password, UserRole role);
+
+    // Оновлення даних користувача
+    bool updateUser(int userId, const std::string& newUsername, const std::string& newPassword, UserRole newRole);
+
+    // Видалення користувача
+    bool deleteUser(int userId);
+
+    // Отримання списку всіх користувачів
+    void listAllUsers();
+
+    // Перевірка чи користувач існує
+    bool userExists(const std::string& username);
+
+    // Отримання поточного активного користувача
+    std::optional<User> getCurrentUser() const;
+
+private:
+    std::shared_ptr<UserDAO> userDAO;
+    std::optional<User> currentUser; // Зберігає дані про поточного користувача
+};
+
+// include/logic/HotelManager.h
+#pragma once
+
+#include "dao/RoomDAO.h"
+#include "dao/ClientDAO.h"
+#include "dao/BookingDAO.h"
+#include <memory>
+
+// Головний клас бізнес-логіки для управління готелем
+class HotelManager {
+public:
+    // Конструктор приймає всі необхідні DAO
+    HotelManager(
+        std::shared_ptr<RoomDAO> roomDAO,
+        std::shared_ptr<ClientDAO> clientDAO,
+        std::shared_ptr<BookingDAO> bookingDAO
+    );
+
+    // --- Методи для роботи з кімнатами ---
+    void listAllRooms();
+    void listAvailableRooms();
+    void addRoom();
+    void updateRoomStatus();
+    void filterRooms();
+
+    // --- Методи для роботи з клієнтами ---
+    void listAllClients();
+    void addNewClient();
+    void findClientsByName();
+
+    // --- Методи для роботи з бронюваннями ---
+    void createNewBooking();
+    void listAllBookings();
+    void generateFinancialReport();
+
+    // --- Методи для програмного додавання даних (для заповнення) ---
+    void addRoom(int number, RoomType type, double price, const std::string& description, bool hasAirConditioner);
+    void addNewClient(const std::string& name, const std::string& contactInfo);
+
+private:
+    std::shared_ptr<RoomDAO> roomDAO;
+    std::shared_ptr<ClientDAO> clientDAO;
+    std::shared_ptr<BookingDAO> bookingDAO;
+    
+    // Допоміжні функції для вводу даних
+    int getIntInput(const std::string& prompt);
+    double getDoubleInput(const std::string& prompt);
+    std::string getStringInput(const std::string& prompt);
+    std::string getDateInput(const std::string& prompt);
+};
+
+// ==== LOGIC IMPLEMENTATIONS ====
+
+// src/logic/AuthenticationManager.cpp
+#include "logic/AuthenticationManager.h"
+#include "utils.h"
+#include <iostream>
+#include <functional> // для std::hash
+
+AuthenticationManager::AuthenticationManager(std::shared_ptr<UserDAO> uDAO) : userDAO(std::move(uDAO)) {}
+
+bool AuthenticationManager::login(const std::string& username, const std::string& password) {
+    auto userOpt = userDAO->findByUsername(username);
+    if (userOpt) {
+        // Хешуємо введений пароль для порівняння
+        size_t passwordHash = std::hash<std::string>{}(password);
+        if (userOpt->hashedPassword == passwordHash) {
+            currentUser = userOpt;
+            std::cout << "Вхід успішний. Вітаємо, " << currentUser->username << "!" << std::endl;
+            return true;
+        }
+    }
+    std::cout << "Невірний логін або пароль." << std::endl;
+    return false;
+}
+
+void AuthenticationManager::logout() {
+    if (currentUser) {
+        std::cout << "Користувач " << currentUser->username << " вийшов з системи." << std::endl;
+        currentUser.reset();
+    }
+}
+
+bool AuthenticationManager::createUser(const std::string& username, const std::string& password, UserRole role) {
+    // Перевірка, чи користувач вже існує
+    if (userDAO->findByUsername(username)) {
+        std::cerr << "Помилка: Користувач з іменем '" << username << "' вже існує." << std::endl;
+        return false;
+    }
+
+    try {
+        size_t passwordHash = std::hash<std::string>{}(password);
+        User newUser(username, passwordHash, role);
+        userDAO->save(newUser);
+        std::cout << "Користувача '" << username << "' успішно створено." << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Не вдалося створити користувача: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool AuthenticationManager::updateUser(int userId, const std::string& newUsername, const std::string& newPassword, UserRole newRole) {
+    auto userOpt = userDAO->findById(userId);
+    if (!userOpt) {
+        std::cerr << "Помилка: Користувача з ID " << userId << " не знайдено." << std::endl;
+        return false;
+    }
+
+    User userToUpdate = *userOpt;
+    userToUpdate.username = newUsername;
+    userToUpdate.role = newRole;
+
+    // Оновлюємо пароль, тільки якщо його було введено
+    if (!newPassword.empty()) {
+        userToUpdate.hashedPassword = std::hash<std::string>{}(newPassword);
+    }
+
+    try {
+        userDAO->update(userToUpdate);
+        std::cout << "Дані користувача з ID " << userId << " успішно оновлено." << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Не вдалося оновити дані користувача: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool AuthenticationManager::deleteUser(int userId) {
+    // Заборона видалення самого себе або адміна з ID 1
+    if (currentUser && currentUser->id == userId) {
+        std::cerr << "Помилка: Ви не можете видалити самого себе." << std::endl;
+        return false;
+    }
+    if (userId == 1) { // Захист головного адміна
+        std::cerr << "Помилка: Ви не можете видалити головного адміністратора." << std::endl;
+        return false;
+    }
+    
+    try {
+        userDAO->remove(userId);
+        std::cout << "Користувача з ID " << userId << " успішно видалено." << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Не вдалося видалити користувача: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void AuthenticationManager::listAllUsers() {
+    auto users = userDAO->findAll();
+    std::cout << "\n--- Список всіх користувачів ---\n";
+    if (users.empty()) {
+        std::cout << "Користувачі не знайдені.\n";
+        return;
+    }
+    for (const auto& user : users) {
+        std::cout << "ID: " << user.id
+                  << ", Логін: " << user.username
+                  << ", Роль: " << roleToString(user.role) << "\n";
+    }
+}
+
+bool AuthenticationManager::userExists(const std::string& username) {
+    return userDAO->findByUsername(username).has_value();
+}
+
+std::optional<User> AuthenticationManager::getCurrentUser() const {
+    return currentUser;
+}
+
+// src/logic/HotelManager.cpp
+#include "logic/HotelManager.h"
+#include "models/Enums.h"
+#include "models/Room.h"
+#include "models/Client.h"
+#include "utils.h"
+#include <iostream>
+#include <string>
+#include <vector>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <chrono>
+#include <iomanip>
+
+// Оголошення функцій, визначених в іншому файлі
+void clearConsole();
+void pauseConsole();
+std::string roleToString(UserRole role);
+
+// --- Конвертери Enum в рядок для виводу ---
+
+// Функція для перетворення RoomType в рядок
+std::string roomTypeToString(RoomType type) {
+    switch (type) {
+        case RoomType::SINGLE:  return "Одномісний";
+        case RoomType::DOUBLE:  return "Двомісний";
+        case RoomType::SUITE:   return "Люкс";
+        case RoomType::DELUXE:  return "Делюкс";
+        default:                return "Невідомий тип";
+    }
+}
+
+// Функція для перетворення RoomStatus в рядок
+std::string roomStatusToString(RoomStatus status) {
+    switch (status) {
+        case RoomStatus::AVAILABLE:   return "Вільний";
+        case RoomStatus::OCCUPIED:    return "Зайнятий";
+        case RoomStatus::MAINTENANCE: return "Обслуговування";
+        default:                      return "Невідомий статус";
+    }
+}
+
+// Функція для перетворення BookingStatus в рядок
+std::string bookingStatusToString(BookingStatus status) {
+    switch (status) {
+        case BookingStatus::CONFIRMED:    return "Підтверджено";
+        case BookingStatus::CHECKED_IN:   return "Заселено";
+        case BookingStatus::CHECKED_OUT:  return "Виселено";
+        case BookingStatus::CANCELLED:    return "Скасовано";
+        default:                          return "Невідомий статус";
+    }
+}
+
+// --- Конструктор ---
+
+HotelManager::HotelManager(
+    std::shared_ptr<RoomDAO> rDAO,
+    std::shared_ptr<ClientDAO> cDAO,
+    std::shared_ptr<BookingDAO> bDAO)
+    : roomDAO(std::move(rDAO)), clientDAO(std::move(cDAO)), bookingDAO(std::move(bDAO)) {}
+
+// --- Допоміжні функції для вводу ---
+
+void clearInputBuffer() {
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+}
+
+int HotelManager::getIntInput(const std::string& prompt) {
+    int value;
+    while (true) {
+        std::cout << prompt;
+        std::cin >> value;
+        if (std::cin.good()) {
+            clearInputBuffer();
+            return value;
+        }
+        std::cout << "Помилка: введіть ціле число." << std::endl;
+        std::cin.clear();
+        clearInputBuffer();
+    }
+}
+
+double HotelManager::getDoubleInput(const std::string& prompt) {
+    double value;
+    while (true) {
+        std::cout << prompt;
+        std::cin >> value;
+        if (std::cin.good()) {
+            clearInputBuffer();
+            return value;
+        }
+        std::cout << "Помилка: введіть число." << std::endl;
+        std::cin.clear();
+        clearInputBuffer();
+    }
+}
+
+std::string HotelManager::getStringInput(const std::string& prompt) {
+    std::string value;
+    std::cout << prompt;
+    std::getline(std::cin, value);
+    return value;
+}
+
+// Допоміжна функція для валідації формату дати YYYY-MM-DD
+bool isValidDate(const std::string& s) {
+    std::tm tm = {};
+    std::stringstream ss(s);
+    ss >> std::get_time(&tm, "%Y-%m-%d");
+    return !ss.fail() && ss.eof();
+}
+
+std::string HotelManager::getDateInput(const std::string& prompt) {
+    std::string dateStr;
+    while (true) {
+        dateStr = getStringInput(prompt);
+        if (isValidDate(dateStr)) {
+            return dateStr;
+        }
+        std::cout << "Невірний формат дати. Будь ласка, використовуйте YYYY-MM-DD.\n";
+    }
+}
+
+// --- Методи для роботи з кімнатами ---
+
+void HotelManager::listAllRooms() {
+    clearConsole();
+    auto rooms = roomDAO->findAll();
+    std::cout << "\n--- Список всіх кімнат ---\n";
+    if (rooms.empty()) {
+        std::cout << "Кімнати не знайдені.\n";
+    } else {
+        for (const auto& room : rooms) {
+            std::cout << "ID: " << room.id
+                      << ", Номер: " << room.roomNumber
+                      << ", Тип: " << roomTypeToString(room.type)
+                      << ", Статус: " << roomStatusToString(room.status)
+                      << ", Ціна: " << room.pricePerNight << " UAH"
+                      << ", Опис: " << room.description
+                      << ", Кондиціонер: " << (room.hasAirConditioner ? "Так" : "Ні") << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+void HotelManager::listAvailableRooms() {
+    clearConsole();
+    auto rooms = roomDAO->findByStatus(RoomStatus::AVAILABLE);
+    std::cout << "\n--- Список вільних кімнат ---\n";
+    if (rooms.empty()) {
+        std::cout << "Вільні кімнати не знайдені.\n";
+    } else {
+        for (const auto& room : rooms) {
+            std::cout << "ID: " << room.id
+                << ", Номер: " << room.roomNumber
+                << ", Тип: " << roomTypeToString(room.type)
+                << ", Ціна: " << room.pricePerNight << " UAH"
+                << ", Опис: " << room.description
+                << ", Кондиціонер: " << (room.hasAirConditioner ? "Так" : "Ні") << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+void HotelManager::addRoom() {
+    clearConsole();
+    std::cout << "\n--- Додавання нової кімнати ---\n";
+    int roomNumber = getIntInput("Введіть номер кімнати: ");
+    if(roomDAO->findByNumber(roomNumber)){
+        std::cout << "Кімната з таким номером вже існує.\n";
+        pauseConsole();
+        return;
+    }
+    int typeInt = getIntInput("Введіть тип (0: Single, 1: Double, 2: Suite, 3: Deluxe): ");
+    double price = getDoubleInput("Введіть ціну за ніч: ");
+    std::string description = getStringInput("Введіть опис кімнати: ");
+    int acInput = getIntInput("Чи є кондиціонер? (1 - так, 0 - ні): ");
+    bool hasAirConditioner = (acInput == 1);
+
+    Room newRoom(roomNumber, static_cast<RoomType>(typeInt), RoomStatus::AVAILABLE, price, description, hasAirConditioner);
+    roomDAO->save(newRoom);
+    std::cout << "Кімнату успішно додано!\n";
+    pauseConsole();
+}
+
+void HotelManager::updateRoomStatus() {
+    clearConsole();
+    std::cout << "\n--- Оновлення статусу кімнати ---\n";
+    int roomId = getIntInput("Введіть ID кімнати для оновлення: ");
+    auto roomOpt = roomDAO->findById(roomId);
+    if (!roomOpt) {
+        std::cout << "Кімнату з ID " << roomId << " не знайдено.\n";
+        pauseConsole();
+        return;
+    }
+    
+    int statusInt = getIntInput("Введіть новий статус (0: Available, 1: Occupied, 2: Maintenance): ");
+    Room roomToUpdate = *roomOpt;
+    roomToUpdate.status = static_cast<RoomStatus>(statusInt);
+    roomDAO->update(roomToUpdate);
+    std::cout << "Статус кімнати успішно оновлено!\n";
+    pauseConsole();
+}
+
+void HotelManager::filterRooms() {
+    clearConsole();
+    std::cout << "\n--- Фільтрація кімнат ---\n";
+    std::cout << "Залиште поле пустим, щоб не використовувати фільтр.\n";
+
+    std::string typeInputStr = getStringInput("Введіть тип (0: Single, 1: Double, 2: Suite, 3: Deluxe): ");
+    std::string priceInputStr = getStringInput("Введіть максимальну ціну: ");
+
+    std::optional<RoomType> typeFilter;
+    if (!typeInputStr.empty()) {
+        try {
+            int typeInt = std::stoi(typeInputStr);
+            if (typeInt >= 0 && typeInt <= 3) {
+                 typeFilter = static_cast<RoomType>(typeInt);
+            } else {
+                std::cout << "Невірний тип кімнати.\n";
+            }
+        } catch (const std::invalid_argument& e) {
+            std::cout << "Помилка: введіть число для типу.\n";
+        }
+    }
+
+    std::optional<double> priceFilter;
+    if (!priceInputStr.empty()) {
+        try {
+            priceFilter = std::stod(priceInputStr);
+        } catch (const std::invalid_argument& e) {
+            std::cout << "Помилка: введіть число для ціни.\n";
+        }
+    }
+
+    auto rooms = roomDAO->findWithFilters(typeFilter, priceFilter);
+
+    std::cout << "\n--- Результати пошуку ---\n";
+    if (rooms.empty()) {
+        std::cout << "Кімнати за вашими критеріями не знайдені.\n";
+    } else {
+        for (const auto& room : rooms) {
+            std::cout << "ID: " << room.id
+                      << ", Номер: " << room.roomNumber
+                      << ", Тип: " << roomTypeToString(room.type)
+                      << ", Статус: " << roomStatusToString(room.status)
+                      << ", Ціна: " << room.pricePerNight << " UAH"
+                      << ", Опис: " << room.description
+                      << ", Кондиціонер: " << (room.hasAirConditioner ? "Так" : "Ні") << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+// --- Методи для роботи з клієнтами ---
+
+void HotelManager::listAllClients() {
+    clearConsole();
+    auto clients = clientDAO->findAll();
+    std::cout << "\n--- Список всіх клієнтів ---\n";
+    if (clients.empty()) {
+        std::cout << "Клієнти не знайдені.\n";
+    } else {
+        for (const auto& client : clients) {
+            std::cout << "ID: " << client.id
+                      << ", ПІБ: " << client.fullName
+                      << ", Контакти: " << client.contactInfo << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+void HotelManager::findClientsByName() {
+    clearConsole();
+    std::cout << "\n--- Пошук клієнтів за іменем ---\n";
+    std::string name = getStringInput("Введіть ім'я або частину імені для пошуку: ");
+    
+    auto clients = clientDAO->findByFullName(name);
+
+    std::cout << "\n--- Результати пошуку ---\n";
+    if (clients.empty()) {
+        std::cout << "Клієнти з таким іменем не знайдені.\n";
+    } else {
+        for (const auto& client : clients) {
+            std::cout << "ID: " << client.id
+                      << ", ПІБ: " << client.fullName
+                      << ", Контакти: " << client.contactInfo << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+void HotelManager::addNewClient() {
+    clearConsole();
+    std::cout << "\n--- Додавання нового клієнта ---\n";
+    std::string name = getStringInput("Введіть ПІБ клієнта: ");
+    std::string contacts = getStringInput("Введіть контактну інформацію: ");
+    
+    Client newClient(name, contacts);
+    clientDAO->save(newClient);
+    std::cout << "Клієнта успішно додано!\n";
+    pauseConsole();
+}
+
+// --- Методи для програмного додавання даних (для заповнення) ---
+
+void HotelManager::addRoom(int number, RoomType type, double price, const std::string& description, bool hasAirConditioner) {
+    if(roomDAO->findByNumber(number)){
+        return; // Кімната вже існує
+    }
+    Room newRoom(number, type, RoomStatus::AVAILABLE, price, description, hasAirConditioner);
+    roomDAO->save(newRoom);
+}
+
+void HotelManager::addNewClient(const std::string& name, const std::string& contactInfo) {
+    // Тут можна додати перевірку на існування клієнта, якщо потрібно
+    Client newClient(name, contactInfo);
+    clientDAO->save(newClient);
+}
+
+// --- Методи для роботи з бронюваннями ---
+
+// Допоміжна функція для розрахунку днів між датами
+long long daysBetween(const std::string& start, const std::string& end) {
+    std::tm start_tm = {};
+    std::tm end_tm = {};
+    std::stringstream ss_start(start);
+    std::stringstream ss_end(end);
+
+    ss_start >> std::get_time(&start_tm, "%Y-%m-%d");
+    ss_end >> std::get_time(&end_tm, "%Y-%m-%d");
+
+    if (ss_start.fail() || ss_end.fail()) {
+        return 0; // Помилка парсингу
+    }
+
+    auto start_time_t = std::mktime(&start_tm);
+    auto end_time_t = std::mktime(&end_tm);
+
+    if (start_time_t == -1 || end_time_t == -1) {
+        return 0; // Некоректна дата
+    }
+    
+    auto duration = std::chrono::duration_cast<std::chrono::hours>(
+        std::chrono::system_clock::from_time_t(end_time_t) - 
+        std::chrono::system_clock::from_time_t(start_time_t)
+    );
+
+    return duration.count() / 24;
+}
+
+void HotelManager::createNewBooking() {
+    clearConsole();
+    std::cout << "\n--- Створення нового бронювання ---\n";
+    listAvailableRooms();
+    int roomId = getIntInput("Введіть ID кімнати для бронювання: ");
+    auto roomOpt = roomDAO->findById(roomId);
+    if (!roomOpt || roomOpt->status != RoomStatus::AVAILABLE) {
+        std::cout << "Помилка: Кімната не доступна для бронювання.\n";
+        pauseConsole();
+        return;
+    }
+
+    listAllClients();
+    int clientId = getIntInput("Введіть ID клієнта: ");
+    if (!clientDAO->findById(clientId)) {
+        std::cout << "Помилка: Клієнта з таким ID не знайдено.\n";
+        pauseConsole();
+        return;
+    }
+    
+    std::string checkIn = getDateInput("Введіть дату заїзду (YYYY-MM-DD): ");
+    std::string checkOut = getDateInput("Введіть дату виїзду (YYYY-MM-DD): ");
+
+    // Перевірка, чи кімната вже заброньована на ці дати
+    if (bookingDAO->isRoomBookedInDateRange(roomId, checkIn, checkOut)) {
+        std::cout << "Помилка: Ця кімната вже заброньована на вибрані дати.\n";
+        pauseConsole();
+        return;
+    }
+
+    Booking newBooking(clientId, roomId, checkIn, checkOut, BookingStatus::CONFIRMED);
+    bookingDAO->save(newBooking);
+
+    // Оновлюємо статус кімнати на "Зайнятий"
+    Room roomToUpdate = *roomOpt;
+    roomToUpdate.status = RoomStatus::OCCUPIED;
+    roomDAO->update(roomToUpdate);
+
+    std::cout << "Бронювання успішно створено!\n";
+    pauseConsole();
+}
+
+void HotelManager::listAllBookings() {
+    clearConsole();
+    auto bookings = bookingDAO->findAll();
+    std::cout << "\n--- Список всіх бронювань ---\n";
+    if (bookings.empty()) {
+        std::cout << "Бронювання не знайдені.\n";
+    } else {
+        for (const auto& booking : bookings) {
+            auto clientName = clientDAO->findById(booking.clientId)->fullName;
+            auto roomNumber = roomDAO->findById(booking.roomId)->roomNumber;
+
+            std::cout << "ID: " << booking.id
+                      << ", Клієнт: " << (clientName.empty() ? "N/A" : clientName)
+                      << ", Кімната: " << (roomNumber ? roomNumber : 0)
+                      << ", Заїзд: " << booking.checkInDate
+                      << ", Виїзд: " << booking.checkOutDate
+                      << ", Статус: " << bookingStatusToString(booking.status) << "\n";
+        }
+    }
+    pauseConsole();
+}
+
+void HotelManager::generateFinancialReport() {
+    clearConsole();
+    std::cout << "\n--- Генерація фінансового звіту ---\n";
+    std::string startDate = getDateInput("Введіть початкову дату (YYYY-MM-DD): ");
+    std::string endDate = getDateInput("Введіть кінцеву дату (YYYY-MM-DD): ");
+
+    auto bookings = bookingDAO->findInDateRange(startDate, endDate);
+    if (bookings.empty()) {
+        std::cout << "За вказаний період бронювання не знайдені.\n";
+        pauseConsole();
+        return;
+    }
+
+    double totalRevenue = 0;
+    std::cout << "\n--- Звіт про доходи з " << startDate << " по " << endDate << " ---\n";
+
+    for (const auto& booking : bookings) {
+        auto roomOpt = roomDAO->findById(booking.roomId);
+        if (roomOpt && (booking.status == BookingStatus::CHECKED_IN || booking.status == BookingStatus::CHECKED_OUT || booking.status == BookingStatus::CONFIRMED)) {
+            long long nights = daysBetween(booking.checkInDate, booking.checkOutDate);
+            if (nights <= 0) nights = 1; // Мінімально 1 ніч
+
+            double revenue = nights * roomOpt->pricePerNight;
+            totalRevenue += revenue;
+            std::cout << "Бронювання #" << booking.id
+                      << " | Кімната #" << roomOpt->roomNumber
+                      << " | " << nights << " ночей * " << roomOpt->pricePerNight << " UAH = " << revenue << " UAH\n";
+        }
+    }
+
+    std::cout << "--------------------------------------------------\n";
+    std::cout << "Загальний дохід за період: " << totalRevenue << " UAH\n";
+    pauseConsole();
+}
+
+// ==== UI ====
+
+// include/ui/Menu.h
+#pragma once
+
+#include "models/Enums.h"
+#include <iostream>
+#include <vector>
+#include <string>
+#include <functional>
+
+// Представляє один пункт меню
+class MenuItem {
+public:
+    std::string name;
+    std::function<void()> action;
+    UserRole requiredRole;
+
+    MenuItem(std::string name, std::function<void()> action, UserRole requiredRole)
+        : name(std::move(name)), action(std::move(action)), requiredRole(requiredRole) {}
+
+    // Перевіряє, чи має користувач достатньо прав для цього пункту
+    bool canExecute(UserRole userRole) const {
+        return static_cast<int>(userRole) <= static_cast<int>(requiredRole);
+    }
+};
+
+// Клас, що керує меню
+class Menu {
+public:
+    Menu() = default;
+
+    // Додає новий пункт в меню
+    void addItem(const std::string& name, const std::function<void()>& action, UserRole requiredRole) {
+        items.emplace_back(name, action, requiredRole);
+    }
+
+    // Запускає головний цикл меню
+    void run(UserRole currentUserRole);
+
+private:
+    std::vector<MenuItem> items;
+};
+
+// src/ui/Menu.cpp
+#include "ui/Menu.h"
+#include "utils.h"
+#include <limits>
+
+// Оголошення функції, визначеної в іншому файлі
+void clearConsole();
+
+void Menu::run(UserRole currentUserRole) {
+    bool running = true;
+    while (running) {
+        clearConsole();
+        std::cout << "\n--- Головне меню ---\n";
+        std::vector<int> displayedItems;
+        int displayIndex = 1;
+
+        for (size_t i = 0; i < items.size(); ++i) {
+            if (items[i].canExecute(currentUserRole)) {
+                std::cout << displayIndex << ". " << items[i].name << std::endl;
+                displayedItems.push_back(i);
+                displayIndex++;
+            }
+        }
+        std::cout << "0. Вихід\n";
+        std::cout << "--------------------\n";
+        std::cout << "Ваш вибір: ";
+
+        int choice;
+        std::cin >> choice;
+
+        if (std::cin.fail()) {
+            std::cout << "Помилка: будь ласка, введіть номер.\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+        
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Очистка буфера
+
+        if (choice == 0) {
+            running = false;
+        } else if (choice > 0 && choice <= displayedItems.size()) {
+            items[displayedItems[choice - 1]].action();
+        } else {
+            std::cout << "Невірний вибір. Спробуйте ще раз.\n";
+        }
+    }
+}
+
+// ==== UTILS ====
+
+// include/utils.h
+#pragma once
+
+#include <string>
+#include "models/Enums.h"
+
+// Оголошення спільних функцій
+
+void clearConsole();
+void pauseConsole();
+std::string roleToString(UserRole role);
+std::string getConfigValue(const std::string& key);
+
+// src/utils.cpp
+#include "utils.h"
+#include <iostream>
+#include <cstdlib>
+#include <limits>
+#include <fstream>
+#include <sstream>
+
+void clearConsole() {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void pauseConsole() {
+    std::cout << "\nНатисніть Enter, щоб продовжити...";
+    // Очищуємо буфер перед очікуванням вводу
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+}
+
+std::string roleToString(UserRole role) {
+    switch (role) {
+        case UserRole::ADMINISTRATOR: return "Адміністратор";
+        case UserRole::MANAGER:       return "Менеджер";
+        case UserRole::RECEPTIONIST:  return "Реєстратор";
+        case UserRole::HOUSEKEEPING:  return "Обслуговування";
+        case UserRole::GUEST:         return "Гість";
+        default:                      return "Невідома роль";
+    }
+}
+
+std::string getConfigValue(const std::string& key) {
+    std::ifstream configFile("config.ini");
+    std::string line;
+    std::string foundValue = "";
+
+    if (configFile.is_open()) {
+        while (getline(configFile, line)) {
+            std::stringstream ss(line);
+            std::string currentKey;
+            std::string currentValue;
+
+            if (getline(ss, currentKey, '=') && getline(ss, currentValue)) {
+                if (currentKey == key) {
+                    foundValue = currentValue;
+                    break;
+                }
+            }
+        }
+        configFile.close();
+    } else {
+        std::cerr << "Не вдалося відкрити файл конфігурації 'config.ini'" << std::endl;
+    }
+
+    return foundValue;
+} 

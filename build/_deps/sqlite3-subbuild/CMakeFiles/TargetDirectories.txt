@@ -1,0 +1,3 @@
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/sqlite3-populate.dir
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/edit_cache.dir
+D:/other/Project_on_c++/build/_deps/sqlite3-subbuild/CMakeFiles/rebuild_cache.dir
